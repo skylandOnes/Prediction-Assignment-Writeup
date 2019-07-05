@@ -1,0 +1,86 @@
+---
+title: "Prediction Assignment Writeup"
+date: "05-Jul-2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways.
+
+## Pre-Analysis on Input Data
+
+The Data set contains 6 people, (carlitos, pedro, adeimo, charles, eurico, jeremy) as the participants to be inspected. The label for the Data set has been divided into 5 classes, (A, B, C, D, E). What we want to do is to train and validate using the offered Data set then predict the result with the testing Data set.
+
+## Install or import the dependency packages
+```{r pressure}
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(RColorBrewer)
+library(rattle)
+library(e1071)
+library(randomForest)
+```
+
+## Download Data
+Various missing data (i.e., “NA”, “#DIV/0!” and “”) can be set to NA.
+```{r}
+# Training data from the raw data source
+tdata <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+tdf <- read.csv(url(tdata),na.strings=c("NA","#DIV/0!",""))
+
+# Testing data from the raw data source
+test_data <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+test_df <- read.csv(url(test_data),na.strings=c("NA","#DIV/0!",""))
+```
+
+## Data Processing
+1. Drop the unuseful columns to reduce the computing
+2. Drop the NAs of columns
+```{r}
+# Drop the first 7 columns as they're unnecessary for predicting.
+tdf_1 <- tdf[,8:length(colnames(tdf))]
+test_df_1 <- test_df[,8:length(colnames(test_df))]
+# Drop colums with NAs
+tdf_2 <- tdf_1[, colSums(is.na(tdf_1)) == 0] 
+test_df_2 <- test_df_1[, colSums(is.na(test_df_1)) == 0] 
+```
+
+## Split Data frame
+The training data will be splitted into two parts as the 80%:20%. The 80% data is used to fit the model, the rest of the data is used to validate the fitted model.
+```{r}
+in.training <- createDataPartition(tdf_2$classe, p=0.70, list=F)
+train.data.model <- tdf_2[in.training, ]
+validate.data.model <- tdf_2[-in.training, ]
+```
+
+## Train the model with Random Forest
+We will use the random forest model to fit the data. Random Forest is a classifier that evolves from decision trees. It actually consists of many decision trees. To classify a new instance, each decision tree provides a classification for input data; random forest collects the classifications and chooses the most voted prediction as the result.
+```{r}
+parms <- trainControl(method="cv", 5)
+rf.model <- train(classe ~ ., data=train.data.model, method="rf",
+                 trControl=parms, ntree=251)
+rf.model
+```
+
+## Evaluate the model performance with validation data set
+```{r}
+rf.predict <- predict(rf.model, validate.data.model)
+confusionMatrix(validate.data.model$classe, rf.predict)
+```
+
+## Results
+The accuracy of this model is above 0.990 and the Overall Out-of-Sample error is less than  0.01.
+
+## Test the model withe test data
+```{r}
+results <- predict(rf.model, 
+                   test_df_2[, -length(names(test_df_2))])
+results
+```
+
